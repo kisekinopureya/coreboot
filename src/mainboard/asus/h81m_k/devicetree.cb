@@ -13,7 +13,7 @@ chip northbridge/intel/haswell # FIXME: check ec_present, usb_xhci_on_resume, gf
 		.backlight_off_delay_ms	=   0,
 		.backlight_pwm_hz	=   0,
 	}"
-	register "spd_addresses" = "{0x50, 0x51, 0x52, 0x53}" # FIXME: Put proper SPD map here"
+	register "spd_addresses" = "{0x50, 0, 0x52, 0}"
 	register "usb_xhci_on_resume" = "false"
 	chip cpu/intel/haswell
 		device cpu_cluster 0x0 on
