@@ -1,4 +1,7 @@
 Category: desktop
+Board URL: https://www.asus.com/motherboards-components/motherboards/business/h81mk
+ROM package: DIP-8
 ROM protocol: SPI
-Flashrom support: n
-FIXME: check category, , put ROM package, ROM socketed, Release year
+ROM socketed: y
+Flashrom support: y
+Release year: 2013
