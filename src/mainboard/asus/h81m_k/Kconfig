@@ -22,4 +22,7 @@ config MAINBOARD_PART_NUMBER
 config USBDEBUG_HCD_INDEX # FIXME: check this
 	int
 	default 2
+
+config CBFS_SIZE
+        default 0x600000
 endif
