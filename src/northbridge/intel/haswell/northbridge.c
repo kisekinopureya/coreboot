@@ -3,8 +3,10 @@
 #include <commonlib/helpers.h>
 #include <console/console.h>
 #include <acpi/acpi.h>
+#include <acpi/acpigen.h>
 #include <delay.h>
 #include <cpu/intel/haswell/haswell.h>
+#include <cpu/cpu.h>
 #include <device/device.h>
 #include <device/pci.h>
 #include <device/pci_ids.h>
@@ -183,7 +185,6 @@ static void read_map_entry(struct device *dev, struct map_entry *entry, uint64_t
 
 enum {
 	TOM_REG,
-	TOUUD_REG,
 	MESEG_BASE_REG,
 	MESEG_LIMIT_REG,
 	REMAP_BASE_REG,
@@ -198,7 +199,6 @@ enum {
 
 static struct map_entry memory_map[NUM_MAP_ENTRIES] = {
 	[TOM_REG]         = MAP_ENTRY_BASE_64(TOM, "TOM"),
-	[TOUUD_REG]       = MAP_ENTRY_BASE_64(TOUUD, "TOUUD"),
 	[MESEG_BASE_REG]  = MAP_ENTRY_BASE_64(MESEG_BASE, "MESEG_BASE"),
 	[MESEG_LIMIT_REG] = MAP_ENTRY_LIMIT_64(MESEG_LIMIT, "MESEG_LIMIT"),
 	[REMAP_BASE_REG]  = MAP_ENTRY_BASE_64(REMAPBASE, "REMAP_BASE"),
@@ -208,6 +208,14 @@ static struct map_entry memory_map[NUM_MAP_ENTRIES] = {
 	[BGSM_REG]        = MAP_ENTRY_BASE_32(BGSM, "BGSM"),
 	[TSEG_REG]        = MAP_ENTRY_BASE_32(TSEG, "TSEGMB"),
 };
+
+static uint64_t get_touud(const struct device *dev)
+{
+	uint64_t touud = pci_read_config32(dev, TOUUD + 4);
+	touud <<= 32;
+	touud |= pci_read_config32(dev, TOUUD) & 0xfff00000;
+	return touud;
+}
 
 static void mc_read_map_entries(struct device *dev, uint64_t *values)
 {
@@ -298,7 +306,7 @@ static void mc_add_dram_resources(struct device *dev, int *resource_cnt)
 		mmio_from_to(dev, index++, mc_values[BGSM_REG], mc_values[TOLUD_REG]);
 
 	/* 4GiB -> TOUUD */
-	upper_ram_end(dev, index++, mc_values[TOUUD_REG]);
+	upper_ram_end(dev, index++, get_touud(dev));
 
 	*resource_cnt = index;
 }
@@ -484,7 +492,6 @@ static void northbridge_final(struct device *dev)
 	pci_or_config32(dev, REMAPBASE,   1 << 0);
 	pci_or_config32(dev, REMAPLIMIT,  1 << 0);
 	pci_or_config32(dev, TOM,         1 << 0);
-	pci_or_config32(dev, TOUUD,       1 << 0);
 	pci_or_config32(dev, BDSM,        1 << 0);
 	pci_or_config32(dev, BGSM,        1 << 0);
 	pci_or_config32(dev, TSEG,        1 << 0);
@@ -508,6 +515,25 @@ static void northbridge_final(struct device *dev)
 	mchbar_setbits32(HDAUDRID, 0);
 }
 
+
+static void set_above_4g_pci(const struct device *dev)
+{
+	const uint64_t touud = get_touud(dev);
+	const uint64_t len = POWER_OF_2(cpu_phys_address_size()) - touud;
+
+	acpigen_write_scope("\\");
+	acpigen_write_name_qword("A4GB", touud);
+	acpigen_write_name_qword("A4GS", len);
+	acpigen_pop_len();
+
+	printk(BIOS_DEBUG, "PCI space above 4GB MMIO is at 0x%llx, len = 0x%llx\n", touud, len);
+}
+
+static void mc_gen_ssdt(const struct device *dev)
+{
+	set_above_4g_pci(dev);
+}
+
 static struct device_operations mc_ops = {
 	.read_resources		= mc_read_resources,
 	.set_resources		= pci_dev_set_resources,
@@ -515,6 +541,7 @@ static struct device_operations mc_ops = {
 	.init			= northbridge_init,
 	.final			= northbridge_final,
 	.ops_pci		= &pci_dev_ops_pci,
+	.acpi_fill_ssdt		= mc_gen_ssdt,
 };
 
 static const unsigned short mc_pci_device_ids[] = {

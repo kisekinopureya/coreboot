@@ -28,4 +28,8 @@ config MAINBOARD_PART_NUMBER
 
 config CBFS_SIZE
         default 0x600000
+
+config SOC_PHYSICAL_ADDRESS_WIDTH
+    int
+        default 39
 endif
